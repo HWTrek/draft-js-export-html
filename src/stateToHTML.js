@@ -29,13 +29,14 @@ type BlockRenderer = (block: ContentBlock) => ?string;
 type BlockRendererMap = {[blockType: string]: BlockRenderer};
 
 type StyleMap = {[styleName: string]: RenderConfig};
-
 type BlockStyleFn = (block: ContentBlock) => ?RenderConfig;
+type EntityRenderMap = {[entityType: string]:Function};
 
 type Options = {
   inlineStyles?: StyleMap;
   blockRenderers?: BlockRendererMap;
   blockStyleFn?: BlockStyleFn;
+  entityRenderers?: EntityRenderMap;
 };
 
 const {
@@ -64,7 +65,7 @@ const DEFAULT_STYLE_ORDER = [BOLD, ITALIC, UNDERLINE, STRIKETHROUGH, CODE];
 
 // Map entity data to element attributes.
 const ENTITY_ATTR_MAP: {[entityType: string]: AttrMap} = {
-  [ENTITY_TYPE.LINK]: {url: 'href', rel: 'rel', target: 'target', title: 'title', className: 'class'},
+  [ENTITY_TYPE.LINK]: {href: 'href', rel: 'rel', title: 'title', className: 'class'},
   [ENTITY_TYPE.IMAGE]: {src: 'src', height: 'height', width: 'width', alt: 'alt', className: 'class'},
 };
 
@@ -341,17 +342,21 @@ class MarkupGenerator {
         }
         return content;
       }).join('');
+      let {entityRenderers = {}} = this.options;
       let entity = entityKey ? Entity.get(entityKey) : null;
       // Note: The `toUpperCase` below is for compatability with some libraries that use lower-case for image blocks.
       let entityType = (entity == null) ? null : entity.getType().toUpperCase();
       if (entityType != null && entityType === ENTITY_TYPE.LINK) {
         let attrs = DATA_TO_ATTR.hasOwnProperty(entityType) ? DATA_TO_ATTR[entityType](entityType, entity) : null;
         let attrString = stringifyAttrs(attrs);
-        return `<a${attrString}>${content}</a>`;
+        return `<a${attrString} target="_blank">${content}</a>`;
       } else if (entityType != null && entityType === ENTITY_TYPE.IMAGE) {
         let attrs = DATA_TO_ATTR.hasOwnProperty(entityType) ? DATA_TO_ATTR[entityType](entityType, entity) : null;
         let attrString = stringifyAttrs(attrs);
         return `<img${attrString}/>`;
+      } else if (entityType != null && entityRenderers.hasOwnProperty(entityType)) {
+        let html = entityRenderers.hasOwnProperty(entityType) ? entityRenderers[entityType](entityType, entity) : null;
+        return html ? html : content;
       } else {
         return content;
       }
